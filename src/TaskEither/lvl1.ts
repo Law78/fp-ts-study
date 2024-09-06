@@ -14,13 +14,6 @@ const Post = t.type({
 
 type Post = t.TypeOf<typeof Post>;
 
-const fakeHTTPRequest = () => {
-  return Promise.resolve({
-    id: 1,
-    nome: "Lorenzo",
-  });
-};
-
 const trueHTTPRequest = async (id: number) => {
   const res = await axios.get(
     `https://jsonplaceholder.typicode.com/posts/${id}`
