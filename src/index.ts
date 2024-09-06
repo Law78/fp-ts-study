@@ -1,73 +1,80 @@
-import * as E from "fp-ts/lib/Either";
-import * as TE from "fp-ts/lib/TaskEither";
-import * as t from "io-ts";
-import { pipe } from "fp-ts/lib/function";
-import axios from "axios";
-import { isLeft } from "fp-ts/lib/Either";
+import * as readline from 'readline';
+import { promises as fs } from 'fs';
+import { exec } from 'child_process';
+import path from 'path';
 
-const Post = t.type({
-  userId: t.number,
-  id: t.number,
-  title: t.string,
-  body: t.string,
+const rl = readline.createInterface({
+  input: process.stdin, // Legge l'input dall'utente
+  output: process.stdout // Scrive l'output sulla console
 });
 
-type Post = t.TypeOf<typeof Post>;
+async function getTypeScriptFiles(dir: string): Promise<string[]> {
+    /*
+    Questa funzione legge tutti i file in una directory specifica e restituisce un array di file TypeScript.
+    */
+  const files = await fs.readdir(dir);
+  return files.filter(file => file.endsWith('.ts') && file !== 'index.ts');
+}
 
-const fakeHTTPRequest = () => {
-  return Promise.resolve({
-    id: 1,
-    nome: "Lorenzo",
+async function showMenu() {
+  console.log('Seleziona un\'opzione:');
+  const directories = await fs.readdir(__dirname);
+  const options = directories.filter(dir => fs.stat(path.join(__dirname, dir)).then(stat => stat.isDirectory()));
+
+  options.forEach((option, index) => {
+    console.log(`${index + 1}. ${option}`);
   });
-};
 
-const trueHTTPRequest = async (id: number) => {
-  const res = await axios.get(
-    `https://jsonplaceholder.typicode.com/posts/${id}`
-  );
-  return res.data;
-};
+  rl.question('Inserisci il numero dell\'opzione: ', async (answer) => {
+    const selectedOption = options[parseInt(answer) - 1];
+    if (selectedOption) {
+      const files = await getTypeScriptFiles(path.join(__dirname, selectedOption));
+      console.log(`\nFile disponibili in ${selectedOption}:`);
+      files.forEach((file, index) => {
+        console.log(`${index + 1}. ${file}`);
+      });
 
-const fetchPost = (id: number): TE.TaskEither<Error, Post> => {
-  return TE.tryCatch(
-    () => trueHTTPRequest(id),
-    (e: any) => new Error(e)
-  );
-};
+      rl.question('Inserisci il numero del file da eseguire: ', (fileAnswer) => {
+        const selectedFile = files[parseInt(fileAnswer) - 1];
+        if (selectedFile) {
+          const filePath = path.join(__dirname, selectedOption, selectedFile);
+          console.log(`Esecuzione di ${filePath}`);
+          exec(`ts-node ${filePath}`, (error, stdout, stderr) => {
+            if (error) {
+              console.error(`Errore di esecuzione: ${error}`);
+              return;
+            }
+            console.log(stdout);
+            console.error(stderr);
+            rl.close();
+          });
+        } else {
+          console.log('Selezione non valida');
+          rl.close();
+        }
+      });
+    } else {
+      console.log('Selezione non valida');
+      rl.close();
+    }
+  });
+}
+/*
+Questo codice è un semplice menu interattivo che permette di selezionare un file da eseguire all'interno di una directory specifica. 
+Il codice utilizza le librerie readline per gestire l'input dell'utente e la libreria fs per leggere la directory e i file. 
+Utilizza anche la libreria exec per eseguire i file selezionati.
 
-const decodePost = (data: unknown): E.Either<Error, Post> => {
-  const result = Post.decode(data);
-  if (isLeft(result)) {
-    return E.left(new Error("Decodifica errata"));
-  }
-  return E.right(result.right);
-};
 
-const main = (id: number) => {
-  pipe(
-    fetchPost(id), // ---> TaskEither<Error, Post>  --> Pere
-    TE.chain(
-      (
-        data // ----> TaskEither<Error, number> ----< Peremangiate
-      ) =>
-        pipe(
-          decodePost(data),
-          TE.of,
-          TE.map((res) => ({
-            status: 200,
-            data: {
-              res: data,
-              num: 100,
-            },
-          })),
-          TE.mapLeft((e) => {
-            console.log(e);
-            return new Error("errore");
-          })
-        )
-    ),
-    TE.map((obj) => console.log(obj))
-  )();
-};
+1. Importa i moduli necessari per l'interazione con il filesystem, l'input/output e l'esecuzione di comandi.
+2. Crea un'interfaccia readline per l'input dell'utente.
+3. Definisce una funzione getTypeScriptFiles per ottenere tutti i file TypeScript in una directory.
+4. Implementa la funzione showMenu che:
+Mostra un elenco di sottocartelle nella directory corrente.
+Chiede all'utente di selezionare una sottocartella.
+Mostra un elenco di file TypeScript nella sottocartella selezionata.
+Chiede all'utente di selezionare un file da eseguire.
+Esegue il file selezionato usando ts-node.
+Per utilizzare questo script, assicurati di avere installato ts-node globalmente (npm install -g ts-node) o localmente nel tuo progetto.
+*/
 
-main(1);
+showMenu();
