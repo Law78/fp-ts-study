@@ -56,7 +56,7 @@ const main = (id: number) => {
           TE.map((res) => ({
             status: 200,
             data: {
-              res: data,
+              res,
               num: 100,
             },
           })),
