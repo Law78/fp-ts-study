@@ -26,8 +26,9 @@ async function showMenu() {
   });
 
   rl.question('Inserisci il numero dell\'opzione: ', async (answer) => {
-    const selectedOption = options[parseInt(answer) - 1];
-    if (selectedOption) {
+    const parsedAnswer = parseInt(answer);
+    if (!isNaN(parsedAnswer) && parsedAnswer > 0 && parsedAnswer <= options.length) {
+      const selectedOption = options[parsedAnswer - 1];
       const files = await getTypeScriptFiles(path.join(__dirname, selectedOption));
       console.log(`\nFile disponibili in ${selectedOption}:`);
       files.forEach((file, index) => {
@@ -35,8 +36,10 @@ async function showMenu() {
       });
 
       rl.question('Inserisci il numero del file da eseguire: ', (fileAnswer) => {
-        const selectedFile = files[parseInt(fileAnswer) - 1];
-        if (selectedFile) {
+        const parsedFileAnswer = parseInt(fileAnswer);
+        if (!isNaN(parsedFileAnswer) && parsedFileAnswer > 0 && parsedFileAnswer <= files.length) {
+          const selectedFile = files[parsedFileAnswer - 1];
+          if (selectedFile) {
           const filePath = path.join(__dirname, selectedOption, selectedFile);
           console.log(`Esecuzione di ${filePath}`);
           exec(`ts-node ${filePath}`, (error, stdout, stderr) => {
@@ -47,12 +50,14 @@ async function showMenu() {
             console.log(stdout);
             console.error(stderr);
             rl.close();
-          });
-        } else {
-          console.log('Selezione non valida');
-          rl.close();
+            });
+        
+          } else {
+            console.log('Selezione non valida');
+            rl.close();
         }
-      });
+        }
+    });
     } else {
       console.log('Selezione non valida');
       rl.close();
