@@ -8,27 +8,46 @@ const rl = readline.createInterface({
   output: process.stdout // Scrive l'output sulla console
 });
 
+function handleError(message: string) {
+  console.error(message);
+  rl.close();
+}
+
 async function getTypeScriptFiles(dir: string): Promise<string[]> {
-    /*
-    Questa funzione legge tutti i file in una directory specifica e restituisce un array di file TypeScript.
-    */
-  const files = await fs.readdir(dir);
-  return files.filter(file => file.endsWith('.ts') && file !== 'index.ts');
+  try {
+    const files = await fs.readdir(dir);
+    return files.filter(file => file.endsWith('.ts') && file !== 'index.ts');
+  } catch (error) {
+    console.error(`Errore durante la lettura della directory ${dir}:`, error);
+    return [];
+  }
 }
 
 async function showMenu() {
   console.log('Seleziona un\'opzione:');
-  const directories = await fs.readdir(__dirname);
-  const options = directories.filter(dir => fs.stat(path.join(__dirname, dir)).then(stat => stat.isDirectory()));
+  try {
+    const directories = await fs.readdir(__dirname);
+    const options = await Promise.all(directories.map(async (dir) => {
+      const stat = await fs.stat(path.join(__dirname, dir));
+      return stat.isDirectory() ? dir : null;
+    }));
+    const validOptions = options.filter(Boolean);
 
-  options.forEach((option, index) => {
-    console.log(`${index + 1}. ${option}`);
-  });
+    validOptions.forEach((option, index) => {
+      console.log(`${index + 1}. ${option}`);
+    });
 
-  rl.question('Inserisci il numero dell\'opzione: ', async (answer) => {
-    const parsedAnswer = parseInt(answer);
-    if (!isNaN(parsedAnswer) && parsedAnswer > 0 && parsedAnswer <= options.length) {
-      const selectedOption = options[parsedAnswer - 1];
+    rl.question('Inserisci il numero dell\'opzione: ', async (answer) => {
+      const parsedAnswer = parseInt(answer);
+      if (isNaN(parsedAnswer) || parsedAnswer <= 0 || parsedAnswer > validOptions.length) {
+        return handleError('Selezione non valida');
+      }
+
+      const selectedOption = validOptions[parsedAnswer - 1];
+      if (!selectedOption) {
+        return handleError('Selezione non valida');
+      }
+
       const files = await getTypeScriptFiles(path.join(__dirname, selectedOption));
       console.log(`\nFile disponibili in ${selectedOption}:`);
       files.forEach((file, index) => {
@@ -37,32 +56,31 @@ async function showMenu() {
 
       rl.question('Inserisci il numero del file da eseguire: ', (fileAnswer) => {
         const parsedFileAnswer = parseInt(fileAnswer);
-        if (!isNaN(parsedFileAnswer) && parsedFileAnswer > 0 && parsedFileAnswer <= files.length) {
-          const selectedFile = files[parsedFileAnswer - 1];
-          if (selectedFile) {
-          const filePath = path.join(__dirname, selectedOption, selectedFile);
-          console.log(`Esecuzione di ${filePath}`);
-          exec(`ts-node ${filePath}`, (error, stdout, stderr) => {
-            if (error) {
-              console.error(`Errore di esecuzione: ${error}`);
-              return;
-            }
-            console.log(stdout);
-            console.error(stderr);
-            rl.close();
-            });
-        
-          } else {
-            console.log('Selezione non valida');
-            rl.close();
+        if (isNaN(parsedFileAnswer) || parsedFileAnswer <= 0 || parsedFileAnswer > files.length) {
+          return handleError('Selezione non valida');
         }
+
+        const selectedFile = files[parsedFileAnswer - 1];
+        if (!selectedFile) {
+          return handleError('Selezione non valida');
         }
+
+        const filePath = path.join(__dirname, selectedOption, selectedFile);
+        console.log(`Esecuzione di ${filePath}`);
+        exec(`ts-node ${filePath}`, (error, stdout, stderr) => {
+          if (error) {
+            return handleError(`Errore di esecuzione: ${error}`);
+          }
+          console.log(stdout);
+          console.error(stderr);
+          rl.close();
+        });
+      });
     });
-    } else {
-      console.log('Selezione non valida');
-      rl.close();
-    }
-  });
+
+  } catch (error) {
+    handleError(`Si è verificato un errore durante la lettura della directory: ${error}`);
+  }
 }
 /*
 Questo codice è un semplice menu interattivo che permette di selezionare un file da eseguire all'interno di una directory specifica. 
